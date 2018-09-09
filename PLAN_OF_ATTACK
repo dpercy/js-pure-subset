@@ -6,19 +6,6 @@
   - prints the resulting JS
     (you can view this or pipe it to node)
 
-current puzzle:
-  - fib2.js: the mutable, linear time version
-  - task: allow mutation!!
-    restriction: no function may close over a mutable variable.
-    "escope","through" may help find closed-over vars
-  
-
-repeat:
-  - pick a puzzle
-  - create a restricted-JS file that solves it
-  - add whitelisting until it works
-
-
 
 ... put it in a "notebook"-like UI
     ... avoid rerunning statements whose deps didn't change:
@@ -31,9 +18,24 @@ repeat:
       - unmatched open paren: if reparsing the whole file fails,
         try parsing each cell?
         try parsing tails of the file?
+      - or use "tolerant mode" of esprima?
+
+
+
+repeat:
+  - pick a puzzle
+  - create a restricted-JS file that solves it
+  - add whitelisting until it works
+
 
 
 ... represent imperative "Actions" as a value
     ... integrate with Promises?
         - use "await" syntax?
         - make every Action be / turn-into a Promise?
+
+... support object spread
+    - esprima does not
+      - use another parsing lib?
+      - transpile?
+    - could support restricted use of Object.assign
