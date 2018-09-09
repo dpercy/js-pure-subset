@@ -1,0 +1,39 @@
+
+
+- create a script that:
+  - parses a JS file to an etree
+  - traverses it, allowing only primitives and const name binding
+  - prints the resulting JS
+    (you can view this or pipe it to node)
+
+current puzzle:
+  - fib2.js: the mutable, linear time version
+  - task: allow mutation!!
+    restriction: no function may close over a mutable variable.
+    "escope","through" may help find closed-over vars
+  
+
+repeat:
+  - pick a puzzle
+  - create a restricted-JS file that solves it
+  - add whitelisting until it works
+
+
+
+... put it in a "notebook"-like UI
+    ... avoid rerunning statements whose deps didn't change:
+      - maintain "cells"
+      - compute the reads and defs+writes of each cell using escope
+      - put markers into the editor, telling you which cell it is
+      - invalidating a cell invalidates any cell that depended on it
+        - but rerunning is separate from invalidation
+    ... try to avoid reparsing problems:
+      - unmatched open paren: if reparsing the whole file fails,
+        try parsing each cell?
+        try parsing tails of the file?
+
+
+... represent imperative "Actions" as a value
+    ... integrate with Promises?
+        - use "await" syntax?
+        - make every Action be / turn-into a Promise?

@@ -1,0 +1,10 @@
+{
+  "name": "js-pure-subset",
+  "version": "0.1.0",
+  "scripts": {},
+  "dependencies": {
+    "escodegen": "^1.11.0",
+    "escope": "^3.6.0",
+    "esprima": "^4.0.1"
+  }
+}
