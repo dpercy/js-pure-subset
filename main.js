@@ -42,7 +42,7 @@ function transform(tree) {
       }
       case 'VariableDeclarator': {
         let { init } = tree;
-        init = transform(init);
+        if (init) init = transform(init);
         return { ...tree, init };
       }
       case 'Literal': {
@@ -155,21 +155,87 @@ function transform(tree) {
         update = transform(update);
         return { ...tree, init, test, update };
       }
+      case 'ForOfStatement': {
+        let { left, right, body } = tree;
+        left = transform(left);
+        right = transform(right);
+        body = transform(body);
+        return { ...tree, left, right, body };
+      }
+      case 'UnaryExpression': {
+        let { operator, argument } = tree;
+        argument = transform(argument);
+
+        switch (operator) {
+          case '+':
+          case '-':
+            argument = makeAssertPrimitive(argument);
+            break;
+          default: throw unhandled(tree);
+        }
+
+        return { ...tree, argument };
+      }
       case 'BinaryExpression': {
         let { operator, left, right } = tree;
         left = transform(left);
         right = transform(right);
 
+        // Binops have at least two state-related pitfalls:
+        // 1. ops like `+` can call valueOf, which could be impure
+        // 2. `===` can observe the side-effect that happens when you
+        //    allocate a new Object
+        // So we assert that each operand is a primitive.
+        // - This solves case 1 because you can't customize
+        //   the coercion methods on primitives.
+        // - This solves case 2 because primitives don't have
+        //   any observable identity: all instances of `5` or `"hi"`
+        //   are indistinguishable.
+        // You can still get some "wats" like "a" - "b" ==> NaN.
+        //
+        // TODO what about weaker ops like `==` or `>=` ?
         switch (operator) {
-          case '+':
+          case '===':
           case '<':
+          case '>':
+          case '+':
           case '-':
+          case '*':
+          case '/':
             left = makeAssertPrimitive(left);
             right = makeAssertPrimitive(right);
             break;
           default: throw unhandled(tree);
         }
 
+        return { ...tree, left, right };
+      }
+      case 'AssignmentExpression': {
+        // Left-hand side must be a variable,
+        let { left, right } = tree;
+
+        // Check the pattern for mutations
+        {
+          let patternsToCheck = [left];
+          while (patternsToCheck.length > 0) {
+            let pat;
+            [pat, ...patternsToCheck] = patternsToCheck;
+            switch (pat.type) {
+              case 'MemberExpression':
+                return error(tree, "Can't mutate this value; can only mutate variables");
+              case 'ArrayPattern':
+                patternsToCheck = [...pat.elements, ...patternsToCheck];
+                break;
+              case 'Identifier':
+                break;
+              default: throw unhandled(pat);
+            }
+          }
+        }
+
+        // We don't need to check anything in left, other than mutations??
+        ///left = transform(left);
+        right = transform(right);
         return { ...tree, left, right };
       }
       case 'UpdateExpression': {
@@ -184,6 +250,39 @@ function transform(tree) {
             return makeSeq(makeAssertPrimitive(argument), tree);
           default: throw unhandled(tree);
         }
+      }
+      case 'TemplateLiteral': {
+        let { expressions } = tree;
+        expressions = expressions.map(transform);
+        // IIUC this boils down to string concatenation
+        // (since TaggedTemplateExpressions aren't allowed yet),
+        // so to be consistent with BinaryExpression we enforce that
+        // each argument is a primitive.
+        expressions.map(makeAssertPrimitive);
+        return { ...tree, expressions };
+      }
+      case 'ObjectExpression': {
+        let { properties } = tree;
+        properties = properties.map(transform);
+        return { ...tree, properties };
+      }
+      case 'Property': {
+        let { key, value } = tree;
+        {
+          const { kind, method, shorthand } = tree;
+          if (kind !== 'init') throw unhandled(tree);
+          if (method) throw unhandled(tree);
+          if (shorthand) throw unhandled(tree);
+        }
+        key = transform(key);
+        value = transform(value);
+        return { ...tree, key, value };
+      }
+      case 'MemberExpression': {
+        let { object, property } = tree;
+        object = transform(object);
+        property = transform(property); // TODO this isn't really an id...
+        return { ...tree, object, property };
       }
       default:
         throw unhandled(tree);
@@ -256,6 +355,10 @@ const __pureMethodCall = function(o, f, ...args) {
 
 // mark things pure
 __markFunctionPure([].map);
+__markFunctionPure(''.split);
+__markFunctionPure(''.slice);
+__markFunctionPure(''.trim);
+__markFunctionPure(Math.abs);
 `;
 
 function rewriteMember(tree) {
