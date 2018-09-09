@@ -16,16 +16,39 @@ const commands = tokens.map(parseCommand);
 
 var x = 0, y = 0; // position
 var fx = 1, fy = 0; // facing
+var seen = [];
+outer:
 for (const command of commands) {
+
   if (command.rotate === 'L') {
     [fx, fy] = [-fy, fx];
   } else {
     [fx, fy] = [fy, -fx];
   }
 
-  x += fx*command.forward;
-  y += fy*command.forward;
+  for (let i=0; i<command.forward; ++i) {
+    if (seen.find(stateMatching({ x, y, fx, fy }))) {
+      // This is the first location we've visited twice!
+      break outer;
+    } else {
+      seen = [...seen, { x, y, fx, fy }];
+    }
+    x += fx;
+    y += fy;
+  }
 }
+
+
+function stateMatching(s1) {
+  return function(s2) {
+    // actually we only want to compare positions
+    return (
+      s1.x === s2.x &&
+      s1.y === s2.y
+    );
+  };
+}
+
 
 const dist = Math.abs(x) + Math.abs(y);
 dist;

@@ -67,6 +67,7 @@ function transform(tree) {
         const newTree = {
           type: 'VariableDeclaration',
           kind: 'const',
+          __pleaseHoist: true,
           declarations: [
             {
               type: 'VariableDeclarator',
@@ -176,7 +177,9 @@ function transform(tree) {
 
         return { ...tree, argument };
       }
-      case 'BinaryExpression': {
+      case 'LogicalExpression':
+      case 'BinaryExpression':
+      {
         let { operator, left, right } = tree;
         left = transform(left);
         right = transform(right);
@@ -204,6 +207,13 @@ function transform(tree) {
           case '/':
             left = makeAssertPrimitive(left);
             right = makeAssertPrimitive(right);
+            break;
+
+          // Ops that only convert to boolean don't call any methods though!
+          // So with these it's fine to pass objects / arrays / functions.
+          // This is also handy for idiomatic null checking.
+          case '&&':
+          case '||':
             break;
           default: throw unhandled(tree);
         }
@@ -251,6 +261,11 @@ function transform(tree) {
           default: throw unhandled(tree);
         }
       }
+      case 'LabeledStatement': {
+        let { body } = tree;
+        body = transform(body);
+        return { ...tree, body };
+      }
       case 'TemplateLiteral': {
         let { expressions } = tree;
         expressions = expressions.map(transform);
@@ -289,8 +304,33 @@ function transform(tree) {
     }
   }
 
+  function handleHoisting(tree) {
+    let { body } = tree;
+    body = body.map((node, i) => {
+      return { ...node, __index: i };
+    });
+    body = sortedBy(body, node => {
+      return node.__pleaseHoist ? node.__index : (body.length + node.__index);
+    });
+    return { ...tree, body };
+  }
+
   const newTree = transform(tree);
-  return [newTree, errors];
+  const newTreeHoisted = handleHoisting(tree);
+
+  return [newTreeHoisted, errors];
+}
+
+function sortedBy(list, keyFn) {
+  list = [...list];
+  list.sort((a, b) => {
+    const ka = keyFn(a);
+    const kb = keyFn(b);
+    if (ka < kb) return -1;
+    if (ka > kb) return +1;
+    return 0;
+  });
+  return list;
 }
 
 function makeThrowString(str) {
@@ -355,6 +395,7 @@ const __pureMethodCall = function(o, f, ...args) {
 
 // mark things pure
 __markFunctionPure([].map);
+__markFunctionPure([].find);
 __markFunctionPure(''.split);
 __markFunctionPure(''.slice);
 __markFunctionPure(''.trim);
