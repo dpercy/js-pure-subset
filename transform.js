@@ -444,3 +444,7 @@ function makeSeq(...args) {
 if (module === require.main) {
   main();
 }
+
+module.exports = {
+  transform,
+};
